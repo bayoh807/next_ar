@@ -32,7 +32,7 @@ export default function ARScene() {
     return (
        isClient && (  <div >
         <ARCanvas
-          onCreated={({ gl }) => {
+          onCreated={({ gl } : { gl : any }) => {
             console.log('ARCanvas created', gl);
           }}
         >
