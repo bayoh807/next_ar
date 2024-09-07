@@ -84,6 +84,17 @@ function MapClient({ apiKey }: { apiKey: string }) {
 
   const [modalTitle, setModalTitle] = useState<string>("")
   const [modalContent, setModalContent] = useState<string>("")
+  const [isLoadingComplete, setIsLoadingComplete] = useState(false);
+
+  useEffect(() => {
+    if (isLoaded) {
+      const timer = setTimeout(() => {
+        setIsLoadingComplete(true);
+      }, 1700); // 確保 Loading 至少顯示 2 秒
+
+      return () => clearTimeout(timer);
+    }
+  }, [isLoaded]);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -412,7 +423,7 @@ useEffect(() => {
     }
   };
   
-  if (!isLoaded) return <Loading />
+  if (!isLoadingComplete){ return <Loading /> }
 
   return (
     <div className="relative w-screen h-screen max-w-[1200px] mx-auto ">
@@ -641,23 +652,34 @@ const WarningModal: React.FC<WarningModalProps> = ({ title, content, onConfirm }
   );
 };
 
+const Loading = () => {
+  const [showLoading, setShowLoading] = useState(true);
 
-const Loading = () => (
-  <div className="fixed inset-0 flex items-center justify-center bg-white z-50">
-    <div className="flex flex-col items-center">
-      <div className="loader rounded-full border-4 border-t-4 border-gray-300 h-12 w-12 mb-4"></div>
-      <p className="text-gray-700 text-sm">載入中，請稍候...</p>
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowLoading(false);
+    }, 3000); // 3 seconds minimum display time
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!showLoading) return null;
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <video
+        className="w-full h-full object-cover"
+        autoPlay
+        loop
+        muted
+        playsInline
+      >
+        <source src="/monkeyMagic.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+      {/* <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+        <p className="text-white text-lg font-bold">載入中，請稍候...</p>
+      </div> */}
     </div>
-
-    <style jsx>{`
-      .loader {
-        border-top-color: #3498db;
-        animation: spin 1s linear infinite;
-      }
-
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-    `}</style>
-  </div>
-);
+  );
+};
