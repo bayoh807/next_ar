@@ -188,7 +188,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
     if (!spot) return null;
 
     return (
-      <div className="fixed bottom-0 left-0 right-0 bg-white p-4 shadow-md transition-all duration-300 transform translate-y-0">
+      <div className="fixed bottom-0 left-0 right-0 bg-white text-black p-4 shadow-md transition-all duration-300 transform translate-y-0">
         <h2 className="text-lg font-bold">{spot.parkName}</h2>
         <p className="text-sm">開放時間: {spot.servicetime}</p>
         <div className="flex justify-between mt-2">
