@@ -5,12 +5,14 @@ import { GoogleMap, useJsApiLoader, Marker as GoogleMapMarker } from '@react-goo
 
 const containerStyle = {
   width: "100vw",
-  height: "100vh"
+  height: "100vh",
+  maxWidth: "1200px", // 設定桌面版寬度限制
+  margin: "0 auto", // 讓地圖在桌面版居中
 };
 
 const defaultCenter = {
-  lat: 25.0330,
-  lng: 121.5654
+  lat: 25.017341,
+  lng: 121.539752
 };
 
 const libraries: ("places")[] = ["places"];
@@ -62,12 +64,18 @@ function MapClient({ apiKey }: { apiKey: string }) {
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [parkingSpots, setParkingSpots] = useState<ParkingSpot[]>([]);
-  const [vehicleType, setVehicleType] = useState<'motorcycle' | 'car'>('car');
+  const [vehicleType, setVehicleType] = useState<'motorcycle' | 'car'>('car')
+  const [viewMode, setViewMode] = useState<'mapview'|'AR'>('AR');
   const [currentLocation, setCurrentLocation] = useState<google.maps.LatLngLiteral | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<ParkingSpot | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [lastFetchedLocation, setLastFetchedLocation] = useState<google.maps.LatLngLiteral | null>(null);
+  
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [zoomLevel, setZoomLevel] = useState(15); 
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -107,18 +115,23 @@ function MapClient({ apiKey }: { apiKey: string }) {
           lat: place.geometry.location.lat(),
           lng: place.geometry.location.lng()
         };
+  
+        // 檢查是否超過台北市範圍
+        const taipeiLatRange = [24.9, 25.2];
+        const taipeiLngRange = [121.4, 121.7];
 
-        console.log('Selected location:', place.name, newCenter);
-
-        setCurrentLocation(newCenter);
-        setLastFetchedLocation(newCenter);
-        
-        if (map) {
-          map.setCenter(newCenter);
-          map.setZoom(15);
+        if (newCenter.lat < taipeiLatRange[0] || newCenter.lat > taipeiLatRange[1] ||
+          newCenter.lng < taipeiLngRange[0] || newCenter.lng > taipeiLngRange[1]) {
+          setIsModalOpen(true); // 打開 Modal
+        } else {
+          setCurrentLocation(newCenter);
+          setLastFetchedLocation(newCenter);
+          if (map) {
+            map.setCenter(newCenter);
+            map.setZoom(15);
+          }
+          fetchParkingData(newCenter);
         }
-
-        fetchParkingData(newCenter);
       } else {
         console.error('Place has no geometry');
         alert('無法獲取該地點的位置資訊，請嘗試其他搜尋關鍵字。');
@@ -143,7 +156,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
 
   const onUnmount = useCallback(function callback(map: google.maps.Map) {
     setMap(null);
-  }, []);
+  }, [handlePlaceSelect]);
 
 
   const handleLocationError = useCallback((browserHasGeolocation: boolean) => {
@@ -163,6 +176,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
             lng: position.coords.longitude,
           };
           setCurrentLocation(pos);
+          setZoomLevel(15);
           if (map) {
             map.setCenter(pos);
             map.setZoom(15);
@@ -171,10 +185,18 @@ function MapClient({ apiKey }: { apiKey: string }) {
         },
         () => {
           handleLocationError(true);
+          setZoomLevel(15);
+          if (map) {
+            map.setZoom(15);
+          }
         }
       );
     } else {
       handleLocationError(false);
+      setZoomLevel(15);
+      if (map) {
+        map.setZoom(15);
+      }
     }
   }, [fetchParkingData, handleLocationError, map]);
   
@@ -268,16 +290,60 @@ useEffect(() => {
     return null;
   };
 
-  const InfoPanel = ({ spot }: { spot: ParkingSpot | null }) => {
+  const InfoPanel = ({ spot, onClose, vehicleType }: { spot: ParkingSpot | null, onClose: () => void, vehicleType: 'car' | 'motorcycle' }) => {
     if (!spot) return null;
 
+    let payexWord;
+    if(spot.payex.includes("元")){ payexWord = spot.payex.replace("元", "") } else if(
+      spot.payex.includes("累進")){ payexWord ="累進"}
+  
     return (
-      <div className="fixed bottom-0 left-0 right-0 bg-white text-black p-4 shadow-md transition-all duration-300 transform translate-y-0">
-        <h2 className="text-lg font-bold">{spot.parkName}</h2>
-        <p className="text-sm">開放時間: {spot.servicetime}</p>
-        <div className="flex justify-between mt-2">
-          <p>尚有車位: {vehicleType === 'car' ? spot.carRemainderNum : spot.motorRemainderNum}</p>
-          <p>收費標準: {spot.payex}</p>
+      <div
+      className={`fixed left-0 right-0 bottom-0 bg-white text-black p-4 shadow-lg 
+                  transition-transform duration-500 ease-out transform ${spot ? 'translate-y-0' : 'translate-y-full'} 
+                  opacity-${spot ? '100' : '0'} `}
+      style={{ boxShadow: "0 -5px 10px rgba(0, 0, 0, 0.2)" }}
+    >
+        <div className="relative flex justify-center items-center px-10">
+          <h2 className="text-lg font-bold">{spot.parkName}</h2>
+          <button onClick={onClose} aria-label="關閉" className="text-black absolute right-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        
+        <div className="flex justify-center mt-1">
+          <div className="border border-gray-400 rounded-md px-4 py-[1px]">
+            <p className="text-sm text-center">{spot.servicetime}</p>
+          </div>
+        </div>
+
+  
+        {/* 車位與收費區域 */}
+        <div className="flex justify-center gap-4 mt-4">
+          {/* 車位資訊 */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center justify-center w-10 h-10 bg-orange-500 rounded-full text-white font-bold">
+              P
+            </div>
+            <p className="text-lg font-semibold">{vehicleType === 'car' ? spot.carRemainderNum : spot.motorRemainderNum}</p>
+            <div className="flex items-center justify-center w-10 h-10 bg-gray-300 rounded-xl text-xs text-center">
+              <span>尚有<br/>車位</span>
+            </div>
+          </div>
+  
+          {/* 收費資訊 */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center justify-center w-10 h-10 bg-orange-500 rounded-full text-white font-bold text-xl">
+              $
+            </div>
+            <p className="text-xl font-semibold">{payexWord}</p>
+            <div className="flex items-center justify-center w-10 h-10 bg-gray-300 rounded-xl text-xs text-center">
+              <span>收費<br/>標準</span>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -293,10 +359,20 @@ useEffect(() => {
     return Array.from(uniqueSpots.values());
   }, [parkingSpots]);
 
-  if (!isLoaded) return <div>Loading...</div>
+  const handleModalConfirm = () => {
+    setIsModalOpen(false);
+    setCurrentLocation(defaultCenter);
+    setLastFetchedLocation(defaultCenter);
+    if (map) {
+      map.setCenter(defaultCenter);
+      map.setZoom(15);
+    }
+  };
+  
+  if (!isLoaded) return <Loading />
 
   return (
-    <div className="relative w-screen h-screen">
+    <div className="relative w-screen h-screen max-w-[1200px] mx-auto">
       {/* 標題欄 */}
       <div className="fixed top-0 left-0 right-0 bg-white p-4 flex justify-between items-center z-10 shadow-md">
         <div className="w-10"></div>
@@ -362,6 +438,30 @@ useEffect(() => {
         </div>
       </div>
 
+       {/* AR按鈕 */}
+       <div className="absolute left-4 top-2/3 z-10">
+        <div className="bg-white rounded-2xl shadow-md p-1 flex flex-col">
+          <button
+            className={`p-2 w-10 h-10 rounded-full transition-colors duration-300 ${
+              viewMode === 'mapview' ? 'bg-[#5AB4C5] text-white' : 'text-[#5AB4C5]'
+            }`}
+            onClick={() => setViewMode('mapview')}
+            aria-label="地圖模式"
+          >
+            {icon_map}
+          </button>
+          <button
+            className={`p-2 w-10 h-10 rounded-full transition-colors duration-300 ${
+              viewMode === 'AR' ? 'bg-[#5AB4C5] text-white' : 'text-[#5AB4C5]'
+            }`}
+            onClick={() => setViewMode('AR')}
+            aria-label="AR模式"
+          >
+            {icon_ar}
+          </button>
+        </div>
+      </div>
+
       {/* 定位按鈕 */}
       <div className="absolute left-4 top-[140px] z-10">
         <button
@@ -377,7 +477,7 @@ useEffect(() => {
       <GoogleMap
         mapContainerStyle={containerStyle}
         center={currentLocation || defaultCenter}
-        zoom={15}
+        zoom={zoomLevel}
         onLoad={onLoad}
         onUnmount={onUnmount}
       >
@@ -400,7 +500,15 @@ useEffect(() => {
         )}
       </GoogleMap>
 
-      <InfoPanel spot={selectedSpot} />
+      <InfoPanel vehicleType={vehicleType} spot={selectedSpot} onClose={() => setSelectedSpot(null)} />
+
+      {isModalOpen && (
+        <Modal
+          title="請搜尋台北市內的地點"
+          content="您選擇的地點不在台北市範圍內，將重設為預設位置。"
+          onConfirm={handleModalConfirm}
+        />
+      )}
     </div>
   )
 }
@@ -414,14 +522,81 @@ const icon_motor =(
   </svg>
 )
 
-const icon_car = (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
-    <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
-  </svg>
-)
 
 const icon_earth = (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
   <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM8.547 4.505a8.25 8.25 0 1011.672 8.214l-.46-.46a2.252 2.252 0 01-.422-.586l-1.08-2.16a.414.414 0 00-.663-.107.827.827 0 01-.812.21l-1.273-.363a.89.89 0 00-.738 1.595l.587.39c.59.395.674 1.23.172 1.732l-.2.2c-.211.212-.33.498-.33.796v.41c0 .409-.11.809-.32 1.158l-1.315 2.191a2.11 2.11 0 01-1.81 1.025 1.055 1.055 0 01-1.055-1.055v-1.172c0-.92-.56-1.747-1.414-2.089l-.654-.261a2.25 2.25 0 01-1.384-2.46l.007-.042a2.25 2.25 0 01.29-.787l.09-.15a2.25 2.25 0 012.37-1.048l1.178.236a1.125 1.125 0 001.302-.795l.208-.73a1.125 1.125 0 00-.578-1.315l-.665-.332-.091.091a2.25 2.25 0 01-1.591.659h-.18c-.249 0-.487.1-.662.274a.931.931 0 01-1.458-1.137l1.279-2.132z" clipRule="evenodd" />
 </svg>
 )
+
+const icon_car = (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+<path d="M6 19V20C6 20.2833 5.90417 20.5208 5.7125 20.7125C5.52083 20.9042 5.28333 21 5 21H4C3.71667 21 3.47917 20.9042 3.2875 20.7125C3.09583 20.5208 3 20.2833 3 20V12L5.1 6C5.2 5.7 5.37917 5.45833 5.6375 5.275C5.89583 5.09167 6.18333 5 6.5 5H17.5C17.8167 5 18.1042 5.09167 18.3625 5.275C18.6208 5.45833 18.8 5.7 18.9 6L21 12V20C21 20.2833 20.9042 20.5208 20.7125 20.7125C20.5208 20.9042 20.2833 21 20 21H19C18.7167 21 18.4792 20.9042 18.2875 20.7125C18.0958 20.5208 18 20.2833 18 20V19H6ZM5.8 10H18.2L17.15 7H6.85L5.8 10ZM7.5 16C7.91667 16 8.27083 15.8542 8.5625 15.5625C8.85417 15.2708 9 14.9167 9 14.5C9 14.0833 8.85417 13.7292 8.5625 13.4375C8.27083 13.1458 7.91667 13 7.5 13C7.08333 13 6.72917 13.1458 6.4375 13.4375C6.14583 13.7292 6 14.0833 6 14.5C6 14.9167 6.14583 15.2708 6.4375 15.5625C6.72917 15.8542 7.08333 16 7.5 16ZM16.5 16C16.9167 16 17.2708 15.8542 17.5625 15.5625C17.8542 15.2708 18 14.9167 18 14.5C18 14.0833 17.8542 13.7292 17.5625 13.4375C17.2708 13.1458 16.9167 13 16.5 13C16.0833 13 15.7292 13.1458 15.4375 13.4375C15.1458 13.7292 15 14.0833 15 14.5C15 14.9167 15.1458 15.2708 15.4375 15.5625C15.7292 15.8542 16.0833 16 16.5 16ZM5 17H19V12H5V17Z"/>
+</svg>
+)
+
+const icon_ar = (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+<g clip-path="url(#clip0_154_4068)">
+<path d="M20.0167 11.4223C20.0167 12.83 20.0133 14.2379 20.0208 15.6457C20.0218 15.8279 19.9759 15.9275 19.8032 16.0132C17.2701 17.2709 14.7403 18.536 12.2127 19.8049C12.0604 19.8813 11.9432 19.8801 11.7914 19.8037C9.26455 18.5353 6.73549 17.2706 4.20307 16.0129C4.03424 15.9292 3.97949 15.8367 3.97973 15.65C3.98621 12.8343 3.98669 10.0186 3.97901 7.20323C3.97853 7.01022 4.04625 6.9274 4.21003 6.84698C6.74294 5.60683 9.27295 4.36115 11.8013 3.11164C11.9427 3.04179 12.0515 3.03578 12.1975 3.10804C14.7326 4.36188 17.2701 5.61067 19.8104 6.8537C19.9716 6.93268 20.0218 7.02318 20.0208 7.19914C20.0131 8.60686 20.0165 10.0148 20.0165 11.4225L20.0167 11.4223ZM6.87886 7.76665C6.93578 7.80434 6.95331 7.81874 6.97324 7.82858C8.60845 8.63878 10.2429 9.45043 11.882 10.2532C11.9557 10.2892 12.0825 10.2717 12.1618 10.2328C13.7657 9.44683 15.3664 8.65415 16.967 7.86195C17.0119 7.83962 17.0508 7.8053 17.1017 7.77025C17.0635 7.74432 17.0458 7.72872 17.0251 7.71839C15.3988 6.91851 13.7732 6.11647 12.1426 5.32572C12.0554 5.28347 11.9077 5.30123 11.8147 5.34588C10.8865 5.79239 9.96436 6.25091 9.04001 6.70558C8.33179 7.05391 7.6231 7.40103 6.8791 7.76641L6.87886 7.76665ZM10.9917 17.1516C10.9917 15.4709 10.9939 13.831 10.984 12.1912C10.9836 12.1206 10.8853 12.0229 10.809 11.985C9.2804 11.224 7.74846 10.4697 6.21676 9.71473C6.15432 9.68401 6.08852 9.65976 5.99654 9.62063C5.99654 9.71641 5.99654 9.78603 5.99654 9.85541C5.99654 11.3834 5.99942 12.9116 5.99221 14.4396C5.99149 14.6076 6.04529 14.6902 6.19394 14.7639C7.71988 15.5196 9.24197 16.2828 10.7653 17.0438C10.8279 17.075 10.8918 17.104 10.9917 17.1516ZM13.009 17.1432C13.0719 17.1211 13.095 17.1155 13.1157 17.1052C14.6959 16.3164 16.2746 15.5244 17.858 14.7418C17.998 14.6727 18.0059 14.5817 18.0057 14.4564C18.0037 12.9121 18.0045 11.3678 18.0037 9.82348C18.0037 9.76395 17.9951 9.70465 17.9893 9.62687C17.9324 9.65064 17.8959 9.6636 17.8616 9.68064C16.2943 10.4527 14.7285 11.2276 13.1582 11.9931C13.0196 12.0608 13.0071 12.1473 13.0073 12.2738C13.01 13.706 13.009 15.1384 13.009 16.5706C13.009 16.7528 13.009 16.935 13.009 17.1432Z" />
+<path d="M1.99347 1.9817V5.98398H0.0117188V0H5.97906V1.9817H1.99347Z" />
+<path d="M22.0114 1.99272H18.0205V0.00454712H23.9996V5.98348H22.0114V1.99272Z" />
+<path d="M0 23.9909V18.0158H1.98775V21.9941H5.97815V23.9909H0Z" />
+<path d="M23.997 24H18.02V22.0099H22.0047V18.0093H23.997V23.9998V24Z" />
+</g>
+<defs>
+<clipPath id="clip0_154_4068">
+<rect width="24" height="24" />
+</clipPath>
+</defs>
+</svg>
+
+)
+
+const icon_map = (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M6 19V20C6 20.2833 5.90417 20.5208 5.7125 20.7125C5.52083 20.9042 5.28333 21 5 21H4C3.71667 21 3.47917 20.9042 3.2875 20.7125C3.09583 20.5208 3 20.2833 3 20V12L5.1 6C5.2 5.7 5.37917 5.45833 5.6375 5.275C5.89583 5.09167 6.18333 5 6.5 5H17.5C17.8167 5 18.1042 5.09167 18.3625 5.275C18.6208 5.45833 18.8 5.7 18.9 6L21 12V20C21 20.2833 20.9042 20.5208 20.7125 20.7125C20.5208 20.9042 20.2833 21 20 21H19C18.7167 21 18.4792 20.9042 18.2875 20.7125C18.0958 20.5208 18 20.2833 18 20V19H6ZM5.8 10H18.2L17.15 7H6.85L5.8 10ZM7.5 16C7.91667 16 8.27083 15.8542 8.5625 15.5625C8.85417 15.2708 9 14.9167 9 14.5C9 14.0833 8.85417 13.7292 8.5625 13.4375C8.27083 13.1458 7.91667 13 7.5 13C7.08333 13 6.72917 13.1458 6.4375 13.4375C6.14583 13.7292 6 14.0833 6 14.5C6 14.9167 6.14583 15.2708 6.4375 15.5625C6.72917 15.8542 7.08333 16 7.5 16ZM16.5 16C16.9167 16 17.2708 15.8542 17.5625 15.5625C17.8542 15.2708 18 14.9167 18 14.5C18 14.0833 17.8542 13.7292 17.5625 13.4375C17.2708 13.1458 16.9167 13 16.5 13C16.0833 13 15.7292 13.1458 15.4375 13.4375C15.1458 13.7292 15 14.0833 15 14.5C15 14.9167 15.1458 15.2708 15.4375 15.5625C15.7292 15.8542 16.0833 16 16.5 16ZM5 17H19V12H5V17Z" />
+  </svg>)
+
+interface ModalProps {
+  title: string;
+  content: string;
+  onConfirm: () => void;
+}
+
+const Modal: React.FC<ModalProps> = ({ title, content, onConfirm }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-80">
+        <h2 className="text-lg font-bold mb-4">{title}</h2>
+        <p className="mb-6">{content}</p>
+        <button
+          onClick={onConfirm}
+          className="bg-blue-500 text-white px-4 py-2 rounded w-full"
+        >
+          確定
+        </button>
+      </div>
+    </div>
+  );
+};
+
+
+const Loading = () => (
+  <div className="fixed inset-0 flex items-center justify-center bg-white z-50">
+    <div className="flex flex-col items-center">
+      <div className="loader rounded-full border-4 border-t-4 border-gray-300 h-12 w-12 mb-4"></div>
+      <p className="text-gray-700 text-sm">載入中，請稍候...</p>
+    </div>
+
+    <style jsx>{`
+      .loader {
+        border-top-color: #3498db;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    `}</style>
+  </div>
+);
