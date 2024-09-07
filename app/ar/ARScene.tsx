@@ -4,7 +4,7 @@ import { ARCanvas, ARMarker } from '@artcom/react-three-arjs';
 import { useEffect, useState, useRef } from 'react';
 import { Box } from '@react-three/drei';
 import { useGLTF } from '@react-three/drei';
-import  ball  from  './../public/Ball.glb';
+import  ball  from  '../../public/Ball.glb';
 
 
 const Model = ({ url }: { url: string }) => {
@@ -31,11 +31,7 @@ export default function ARScene() {
     }, []);
     return (
        isClient && (  <div >
-        <ARCanvas
-          onCreated={({ gl }) => {
-            console.log('ARCanvas created', gl);
-          }}
-        >
+        <ARCanvas>
           <ambientLight intensity={0.5} />
           <directionalLight position={[0, 10, 5]} intensity={1} />
           <ARMarker
