@@ -11,6 +11,7 @@
   "dependencies": {
     "@ar-js-org/ar.js": "^3.4.5",
     "@artcom/react-three-arjs": "^0.5.5",
+    "@react-google-maps/api": "^2.19.3",
     "@react-three/drei": "^9.111.5",
     "@react-three/fiber": "^8.17.6",
     "@types/three": "^0.167.2",
@@ -20,6 +21,7 @@
     "react": "^18",
     "react-dom": "^18",
     "react-error-boundary": "^4.0.13",
+    "react-icons": "^5.3.0",
     "three": "^0.154.0"
   },
   "devDependencies": {
