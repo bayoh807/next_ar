@@ -1,13 +1,14 @@
 import Image from 'next/image';
 import React from 'react';
-
+import Logo from './../../public/Logo.gif'
+import Monkey from './../../public/monkey-scooter.svg'
 const LandingPage: React.FC = () => {
     return (
         <div className=" bg-sky-50 ">
             <div className="w-full h-screen relative bg-cover bg-no-repeat bg-bottom bg-[url('/background.svg')] ">
                     <Image
                         className="absolute animate__animated top-[1%] left-10 max-w-[200px] w-100 max-h-[100px] "
-                        src="/logo.gif"
+                        src={Logo}
                         width={500}
                         height={500}
                         objectFit="contain"
@@ -15,7 +16,7 @@ const LandingPage: React.FC = () => {
                     />
                     <Image
                         className="absolute animate__animated animate__bounceInRight  top-[20%] right-0 max-w-[300px] w-100"
-                        src="/monkey-scooter.svg"
+                        src={Monkey}
                         width={500}
                         height={500}
                         objectFit="contain"

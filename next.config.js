@@ -3,6 +3,9 @@ const nextConfig = {
   images: {
     domains: ['maps.googleapis.com'],
   },
+  safelist: [
+    "bg-[url('/background.svg')]",
+  ],
   basePath: "",
   output: "standalone",
   webpack: (config) => {
