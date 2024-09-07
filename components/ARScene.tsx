@@ -5,6 +5,7 @@ import {useEffect,useState,useRef} from 'react';
 import { BoxGeometry } from 'three';
 import { extend } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
+import { ball } from  './../public/Ball.glb'
 import {useEffectfulState} from "@react-three/drei/helpers/useEffectfulState";
 
 extend({ BoxGeometry });
@@ -37,7 +38,7 @@ export default function ARScene() {
                    <mesh position={[0, 1, 0]} scale={[0.5, 0.5, 0.5]}>
                        <boxGeometry args={[1, 1, 1]} />
                        <meshBasicMaterial color="yellow" />
-                       <Model url="/ball.glb" />
+                       {/*<Model url="/ball.glb" />*/}
                    </mesh>
                </ARMarker>
            </ARCanvas>
