@@ -1,14 +1,11 @@
 
 "use client"
 
-import { extend } from '@react-three/fiber'
-import { BoxGeometry } from 'three'
-import { ARCanvas, ARMarker } from "@artcom/react-three-arjs"
-import { useLayoutEffect } from 'react';
-import { useConnectionMessage } from '../../util/useConnectionMessage';
-
+import { useLayoutEffect, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import LandingPage from './LandingPage';
+import { handleConnectionMessage } from '../../util/handleConnectionMessage';
 
 
 const ARScene = dynamic(() => import('../../components/ARScene'), { ssr: false });
@@ -17,15 +14,32 @@ const ARScene = dynamic(() => import('../../components/ARScene'), { ssr: false }
 
 export default function Index() {
 
+    const router = useRouter();
+    const [data, setData] = useState<any>(null);
+
     useLayoutEffect(() => {
         const name = 'launch_map';
-        const data = null;
+        let data = null;
 
-        useConnectionMessage(name, data);
+        const handleMessage = async () => {
+            await handleConnectionMessage(name, data);
+            setData(data);
+        };
 
-      }, []); 
-    // const { scene } = useGLTF('/ball.glb')
-    console.log(123);
+        handleMessage();
+        setTimeout(() => {
+            console.log(111);
+            setData(1);
+        }, 6000);
+
+    }, []);
+
+    useEffect(() => {
+        if (data) {
+            router.push('/map');
+        }
+    }, [data, router]);
+
     return (
         <>
             <LandingPage/>
