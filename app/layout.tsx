@@ -1,5 +1,6 @@
 
 import type { Metadata,Viewport } from 'next';
+import "animate.css";
 import { ThemeProvider } from "./../components/theme-provider"
 import Link from 'next/link'
 import '@/app/globals.css'

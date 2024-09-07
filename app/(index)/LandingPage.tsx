@@ -6,7 +6,7 @@ const LandingPage: React.FC = () => {
         <div className=" bg-sky-50 ">
             <div className="w-full h-screen relative bg-cover bg-no-repeat bg-bottom bg-[url('/background.svg')] ">
                     <Image
-                        className="absolute top-[20%] right-0 max-w-[250px] w-100"
+                        className="absolute animate__animated animate__bounceInRight  top-[20%] right-0 max-w-[300px] w-100"
                         src="/monkey-scooter.svg"
                         width={500}
                         height={500}
