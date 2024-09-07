@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { GoogleMap, useJsApiLoader, Marker as GoogleMapMarker } from '@react-google-maps/api'
-import Image from 'next/image'
 
 const containerStyle = {
   width: "100vw",
@@ -63,24 +62,14 @@ function MapClient({ apiKey }: { apiKey: string }) {
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [parkingSpots, setParkingSpots] = useState<ParkingSpot[]>([]);
-  const [vehicleType, setVehicleType] = useState<'motorcycle' | 'car'>('motorcycle');
+  const [vehicleType, setVehicleType] = useState<'motorcycle' | 'car'>('car');
   const [currentLocation, setCurrentLocation] = useState<google.maps.LatLngLiteral | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<ParkingSpot | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-
   const [lastFetchedLocation, setLastFetchedLocation] = useState<google.maps.LatLngLiteral | null>(null);
+  const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
 
-  const onLoad = useCallback(function callback(map: google.maps.Map) {
-    const bounds = new window.google.maps.LatLngBounds(defaultCenter);
-    map.fitBounds(bounds);
-    setMap(map);
-  }, []);
-
-  const onUnmount = useCallback(function callback(map: google.maps.Map) {
-    setMap(null);
-  }, []);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchParkingData = useCallback(async (location: google.maps.LatLngLiteral) => {
     // 检查是否需要获取新数据
@@ -89,9 +78,9 @@ function MapClient({ apiKey }: { apiKey: string }) {
         location.lng !== lastFetchedLocation.lng) {
       try {
         const response = await fetch('/api/parkingData', {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             lon: location.lng,
@@ -105,10 +94,57 @@ function MapClient({ apiKey }: { apiKey: string }) {
         setParkingSpots(data);
         setLastFetchedLocation(location);
       } catch (error) {
-        console.error('Error fetching parking data:', error);
+        console.error("Error fetching parking data:", error);
       }
     }
   }, [lastFetchedLocation]);
+
+  const handlePlaceSelect = useCallback(() => {
+    if (autocomplete) {
+      const place = autocomplete.getPlace();
+      if (place.geometry && place.geometry.location) {
+        const newCenter = {
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng()
+        };
+
+        console.log('Selected location:', place.name, newCenter);
+
+        setCurrentLocation(newCenter);
+        setLastFetchedLocation(newCenter);
+        
+        if (map) {
+          map.setCenter(newCenter);
+          map.setZoom(15);
+        }
+
+        fetchParkingData(newCenter);
+      } else {
+        console.error('Place has no geometry');
+        alert('無法獲取該地點的位置資訊，請嘗試其他搜尋關鍵字。');
+      }
+    }
+  }, [autocomplete, map, fetchParkingData]);
+
+  const onLoad = useCallback(function callback(map: google.maps.Map) {
+    const bounds = new window.google.maps.LatLngBounds(defaultCenter);
+    map.fitBounds(bounds);
+    setMap(map);
+
+    if (inputRef.current) {
+      const autocompleteInstance = new google.maps.places.Autocomplete(inputRef.current, {
+        types: ['geocode']
+      });
+      setAutocomplete(autocompleteInstance);
+
+      autocompleteInstance.addListener('place_changed', handlePlaceSelect);
+    }
+  }, [handlePlaceSelect]);
+
+  const onUnmount = useCallback(function callback(map: google.maps.Map) {
+    setMap(null);
+  }, []);
+
 
   const handleLocationError = useCallback((browserHasGeolocation: boolean) => {
     console.warn(browserHasGeolocation ?
@@ -144,42 +180,46 @@ function MapClient({ apiKey }: { apiKey: string }) {
   
 
   const handleSearch = useCallback(() => {
-    if (inputRef.current && inputRef.current.value.trim() !== '' && map) {
-      const service = new google.maps.places.PlacesService(map);
-      service.textSearch(
-        {
-          query: inputRef.current.value,
-          location: map.getCenter(),
-          radius: 50000 // 搜索半径，单位为米
-        },
-        (results, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
-            const place = results[0];
-            const location = place.geometry?.location;
-            if (location) {
-              const newCenter = { lat: location.lat(), lng: location.lng() };
-              console.log('Search result:', place.name, newCenter);
+    if (inputRef.current && inputRef.current.value.trim() !== '') {
+      if (autocomplete) {
+        const place = autocomplete.getPlace();
+        if (place && place.geometry && place.geometry.location) {
+          handlePlaceSelect();
+        } else {
+          // 如果使用者直接使用搜尋
+          const service = new google.maps.places.PlacesService(map!);
+          service.textSearch({
+            query: inputRef.current.value,
+            location: map?.getCenter(),
+            radius: 50000 // 搜尋半徑，單位為公尺
+          }, (results, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
+              const location = results[0].geometry?.location;
+              if (location) {
+                const newCenter = { lat: location.lat(), lng: location.lng() };
+                console.log('Search result:', results[0].name, newCenter);
 
-              setCurrentLocation(newCenter);
-              setLastFetchedLocation(newCenter);
-              
-              if (map) {
-                map.setCenter(newCenter);
-                map.setZoom(15);
+                setCurrentLocation(newCenter);
+                setLastFetchedLocation(newCenter);
+                
+                if (map) {
+                  map.setCenter(newCenter);
+                  map.setZoom(15);
+                }
+
+                fetchParkingData(newCenter);
               }
-
-              fetchParkingData(newCenter);
+            } else {
+              console.error('Place search was not successful');
+              alert('找不到該地點，請嘗試其他搜尋關鍵字。');
             }
-          } else {
-            console.error('Place search was not successful');
-            alert('找不到該地點，請嘗試其他搜索詞。');
-          }
+          });
         }
-      );
+      }
     } else {
-      alert('請輸入搜索詞。');
+      alert('請輸入搜尋關鍵字。');
     }
-  }, [map, fetchParkingData]);
+  }, [autocomplete, map, fetchParkingData, handlePlaceSelect]);
 
   useEffect(() => {
     if (isInitialLoad) {
