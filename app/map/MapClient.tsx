@@ -654,7 +654,7 @@ const WarningModal: React.FC<WarningModalProps> = ({ title, content, onConfirm }
 
 const Loading = () => {
 
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="w-full h-full max-h-screen lg:h-[1100px] lg:w-[500px] overflow-hidden"></div>
       <video
         className="w-full h-full object-cover"
@@ -670,5 +670,4 @@ const Loading = () => {
         <p className="text-white text-lg font-bold">載入中，請稍候...</p>
       </div> */}
     </div>
-  );
 };
