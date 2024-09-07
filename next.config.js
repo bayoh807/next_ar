@@ -3,7 +3,8 @@ const nextConfig = {
   images: {
     domains: ['maps.googleapis.com'],
   },
-
+  basePath: "",
+  output: "standalone",
   webpack: (config) => {
     config.externals = [...config.externals, 'google'];
 
