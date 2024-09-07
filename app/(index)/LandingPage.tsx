@@ -5,7 +5,7 @@ import Monkey from './../../public/monkey-scooter.svg'
 // import Bg from './../../public/monkey-scooter.svg'
 const LandingPage: React.FC = () => {
 
-    const bgVariants =  " bg-cover bg-no-repeat bg-bottom bg-[url('/background.svg')]"
+    const bgVariants =  " bg-cover bg-no-repeat bg-bottom bg-loading-bg"
 
 
     return (
