@@ -415,7 +415,7 @@ useEffect(() => {
       </div>
 
       {/* 車輛類型切換按鈕 */}
-      <div className="absolute right-4 top-[150px] z-10">
+      <div className="hidden absolute right-4 top-[150px] z-10">
         <div className="bg-white rounded-2xl shadow-md p-1 flex flex-col">
           <button
             className={`p-2 w-10 h-10 rounded-full transition-colors duration-300 ${
@@ -439,7 +439,7 @@ useEffect(() => {
       </div>
 
        {/* AR按鈕 */}
-       <div className="absolute left-4 top-2/3 z-10">
+       <div className="absolute right-4 top-[150px] z-10">
         <div className="bg-white rounded-2xl shadow-md p-1 flex flex-col">
           <button
             className={`p-2 w-10 h-10 rounded-full transition-colors duration-300 ${
