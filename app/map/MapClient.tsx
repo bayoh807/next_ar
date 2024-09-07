@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { GoogleMap, useJsApiLoader, Marker as GoogleMapMarker } from '@react-google-maps/api'
+// import { useRouter } from 'next/router';
+import Link from "next/link"
 
 const containerStyle = {
   width: "100vw",
@@ -56,6 +58,9 @@ interface ParkingSpot {
 }
 
 function MapClient({ apiKey }: { apiKey: string }) {
+
+  // const router = useRouter();
+
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: apiKey,
@@ -152,6 +157,9 @@ function MapClient({ apiKey }: { apiKey: string }) {
 
       autocompleteInstance.addListener('place_changed', handlePlaceSelect);
     }
+
+    map.setZoom(15);
+    map.setCenter(defaultCenter);
   }, [handlePlaceSelect]);
 
   const onUnmount = useCallback(function callback(map: google.maps.Map) {
@@ -460,15 +468,20 @@ useEffect(() => {
           >
             {icon_map}
           </button>
-          <button
-            className={`p-2 w-10 h-10 rounded-full transition-colors duration-300 ${
-              viewMode === 'AR' ? 'bg-[#5AB4C5] text-white' : 'text-[#5AB4C5]'
-            }`}
-            onClick={() => setViewMode('AR')}
-            aria-label="AR模式"
-          >
-            {icon_ar}
-          </button>
+          <Link href="/ar">
+            <button
+              className={`p-2 w-10 h-10 rounded-full transition-colors duration-300 ${
+                viewMode === 'AR' ? 'bg-[#5AB4C5] text-white' : 'text-[#5AB4C5]'
+              }`}
+              onClick={() => {
+                setViewMode('AR')
+                // router.push('/ar');
+              }}
+              aria-label="AR模式"
+            >
+              {icon_ar}
+            </button>
+          </Link>
         </div>
       </div>
 
