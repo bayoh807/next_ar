@@ -68,14 +68,14 @@ function MapClient({ apiKey }: { apiKey: string }) {
   const [viewMode, setViewMode] = useState<'mapview'|'AR'>('AR');
   const [currentLocation, setCurrentLocation] = useState<google.maps.LatLngLiteral | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<ParkingSpot | null>(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
   const [lastFetchedLocation, setLastFetchedLocation] = useState<google.maps.LatLngLiteral | null>(null);
   
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
-  const [zoomLevel, setZoomLevel] = useState(15); 
+  const [zoomLevel, setZoomLevel] = useState<number>(15); 
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -118,7 +118,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
   
         // 檢查是否超過台北市範圍
         const taipeiLatRange = [24.9, 25.2];
-        const taipeiLngRange = [121.4, 121.7];
+        const taipeiLngRange = [121.45, 121.7];
 
         if (newCenter.lat < taipeiLatRange[0] || newCenter.lat > taipeiLatRange[1] ||
           newCenter.lng < taipeiLngRange[0] || newCenter.lng > taipeiLngRange[1]) {
@@ -205,6 +205,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
     if (inputRef.current && inputRef.current.value.trim() !== '') {
       if (autocomplete) {
         const place = autocomplete.getPlace();
+
         if (place && place.geometry && place.geometry.location) {
           handlePlaceSelect();
         } else {
@@ -219,17 +220,26 @@ function MapClient({ apiKey }: { apiKey: string }) {
               const location = results[0].geometry?.location;
               if (location) {
                 const newCenter = { lat: location.lat(), lng: location.lng() };
-                console.log('Search result:', results[0].name, newCenter);
+  
+                 // 檢查是否超過台北市範圍
+                const taipeiLatRange = [24.9, 25.2];
+                const taipeiLngRange = [121.45, 121.7];
 
-                setCurrentLocation(newCenter);
-                setLastFetchedLocation(newCenter);
-                
-                if (map) {
-                  map.setCenter(newCenter);
-                  map.setZoom(15);
+                if (newCenter.lat < taipeiLatRange[0] || newCenter.lat > taipeiLatRange[1] ||
+                  newCenter.lng < taipeiLngRange[0] || newCenter.lng > taipeiLngRange[1]) {
+                  setIsModalOpen(true);
+                } else {
+
+                  setCurrentLocation(newCenter);
+                  setLastFetchedLocation(newCenter);
+                  
+                  if (map) {
+                    map.setCenter(newCenter);
+                    map.setZoom(15);
+                  }
+
+                  fetchParkingData(newCenter);
                 }
-
-                fetchParkingData(newCenter);
               }
             } else {
               console.error('Place search was not successful');
@@ -565,13 +575,25 @@ interface ModalProps {
 
 const Modal: React.FC<ModalProps> = ({ title, content, onConfirm }) => {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-80">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+      <div className="bg-white text-black p-6 rounded-lg shadow-lg w-80 text-center">
+        {/* 圓形背景和驚嘆號 */}
+        <div className="flex justify-center mb-4">
+          <div className="bg-yellow-400 w-12 h-12 flex items-center justify-center rounded-full">
+            <span className="text-white text-2xl font-bold">!</span>
+          </div>
+        </div>
+
+        {/* 標題 */}
         <h2 className="text-lg font-bold mb-4">{title}</h2>
+        
+        {/* 內容 */}
         <p className="mb-6">{content}</p>
+
+        {/* 按鈕 */}
         <button
           onClick={onConfirm}
-          className="bg-blue-500 text-white px-4 py-2 rounded w-full"
+          className="bg-[#5AB4C5] text-white px-3 py-2 rounded w-full"
         >
           確定
         </button>
