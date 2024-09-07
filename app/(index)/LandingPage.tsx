@@ -2,10 +2,15 @@ import Image from 'next/image';
 import React from 'react';
 import Logo from './../../public/Logo.gif'
 import Monkey from './../../public/monkey-scooter.svg'
+// import Bg from './../../public/monkey-scooter.svg'
 const LandingPage: React.FC = () => {
+
+    const bgVariants =  " bg-cover bg-no-repeat bg-bottom bg-[url('/background.svg')]"
+
+
     return (
         <div className=" bg-sky-50 ">
-            <div className="w-full h-screen relative bg-cover bg-no-repeat bg-bottom bg-[url('/background.svg')] ">
+            <div className={`w-full h-screen relative ${bgVariants}`}>
                     <Image
                         className="absolute animate__animated top-[1%] left-10 max-w-[200px] w-100 max-h-[100px] "
                         src={Logo}
