@@ -9,16 +9,22 @@ const containerStyle = {
   height: "100vh"
 };
 
-const center = {
+const defaultCenter = {
   lat: 25.0330,
   lng: 121.5654
 };
 
 const libraries: ("places")[] = ["places"];
 
-interface Marker {
-  position: google.maps.LatLng | google.maps.LatLngLiteral;
-  name: string;
+interface ParkingSpot {
+  parkId: string;
+  parkName: string;
+  servicetime: string;
+  payex: string;
+  lon: number;
+  lat: number;
+  carRemainderNum: number;
+  motorRemainderNum: number;
 }
 
 function MapClient({ apiKey }: { apiKey: string }) {
@@ -29,13 +35,14 @@ function MapClient({ apiKey }: { apiKey: string }) {
   })
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [markers, setMarkers] = useState<Marker[]>([]);
+  const [parkingSpots, setParkingSpots] = useState<ParkingSpot[]>([]);
   const [vehicleType, setVehicleType] = useState<'motorcycle' | 'car'>('motorcycle');
   const [currentLocation, setCurrentLocation] = useState<google.maps.LatLngLiteral | null>(null);
+  const [selectedSpot, setSelectedSpot] = useState<ParkingSpot | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const onLoad = useCallback(function callback(map: google.maps.Map) {
-    const bounds = new window.google.maps.LatLngBounds(center);
+    const bounds = new window.google.maps.LatLngBounds(defaultCenter);
     map.fitBounds(bounds);
     setMap(map);
   }, []);
@@ -48,13 +55,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
     console.warn(browserHasGeolocation ?
                   "Error: The Geolocation service failed." :
                   "Error: Your browser doesn't support geolocation.");
-    // 使用地圖中心作為當前位置
-    if (map) {
-      const center = map.getCenter();
-      if (center) {
-        setCurrentLocation({lat: center.lat(), lng: center.lng()});
-      }
-    }
+    fetchParkingData(defaultCenter);
   };
 
   const getCurrentLocation = () => {
@@ -70,6 +71,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
             map.setCenter(pos);
             map.setZoom(15);
           }
+          fetchParkingData(pos);
         },
         () => {
           handleLocationError(true);
@@ -80,6 +82,29 @@ function MapClient({ apiKey }: { apiKey: string }) {
     }
   };
 
+  const fetchParkingData = async (location: google.maps.LatLngLiteral) => {
+  try {
+    const response = await fetch('/api/parkingData', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        lon: location.lng,
+        lat: location.lat,
+      }),
+    });
+
+    const data = await response.json();
+    setParkingSpots(data);
+  } catch (error) {
+    console.error('Error fetching parking data:', error);
+  }
+};
+  useEffect(() => {
+    getCurrentLocation();
+  }, []);
+
   const handleSearch = () => {
     if (map && inputRef.current) {
       const service = new google.maps.places.PlacesService(map);
@@ -89,19 +114,51 @@ function MapClient({ apiKey }: { apiKey: string }) {
       };
 
       service.findPlaceFromQuery(request, (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          setMarkers(results.filter(place => place.geometry && place.geometry.location).map(place => ({
-            position: place.geometry!.location!,
-            name: place.name || 'Unknown Place',
-          })));
-          
-          if (results[0]?.geometry?.location) {
-            map.setCenter(results[0].geometry.location);
-          }
+        if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]?.geometry?.location) {
+          const location = results[0].geometry.location.toJSON();
+          map.setCenter(location);
+          fetchParkingData(location);
         }
       });
     }
   }
+
+  const CustomMarker = ({ spot }: { spot: ParkingSpot }) => {
+    const remainderNum = vehicleType === 'car' ? spot.carRemainderNum : spot.motorRemainderNum;
+    
+    if (remainderNum === 0) return null;
+
+    return (
+      <GoogleMapMarker
+        position={{ lat: spot.lat, lng: spot.lon }}
+        onClick={() => setSelectedSpot(spot)}
+        icon={{
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+              <circle cx="20" cy="20" r="18" fill="#5AB4C5" />
+              <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="12">${remainderNum}</text>
+            </svg>
+          `),
+          scaledSize: new window.google.maps.Size(40, 40)
+        }}
+      />
+    );
+  };
+
+  const InfoPanel = ({ spot }: { spot: ParkingSpot | null }) => {
+    if (!spot) return null;
+
+    return (
+      <div className="fixed bottom-0 left-0 right-0 bg-white p-4 shadow-md transition-all duration-300 transform translate-y-0">
+        <h2 className="text-lg font-bold">{spot.parkName}</h2>
+        <p className="text-sm">開放時間: {spot.servicetime}</p>
+        <div className="flex justify-between mt-2">
+          <p>尚有車位: {vehicleType === 'car' ? spot.carRemainderNum : spot.motorRemainderNum}</p>
+          <p>收費標準: {spot.payex}</p>
+        </div>
+      </div>
+    );
+  };
 
   if (!isLoaded) return <div>Loading...</div>
 
@@ -165,8 +222,8 @@ function MapClient({ apiKey }: { apiKey: string }) {
             onClick={() => setVehicleType('car')}
             aria-label="汽車模式"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
-              <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
+            <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
             </svg>
           </button>
         </div>
@@ -179,41 +236,35 @@ function MapClient({ apiKey }: { apiKey: string }) {
           className="bg-white p-2 rounded-full shadow-md text-[#5AB4C5]"
           aria-label="獲取當前位置"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-            <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM8.547 4.505a8.25 8.25 0 1011.672 8.214l-.46-.46a2.252 2.252 0 01-.422-.586l-1.08-2.16a.414.414 0 00-.663-.107.827.827 0 01-.812.21l-1.273-.363a.89.89 0 00-.738 1.595l.587.39c.59.395.674 1.23.172 1.732l-.2.2c-.211.212-.33.498-.33.796v.41c0 .409-.11.809-.32 1.158l-1.315 2.191a2.11 2.11 0 01-1.81 1.025 1.055 1.055 0 01-1.055-1.055v-1.172c0-.92-.56-1.747-1.414-2.089l-.654-.261a2.25 2.25 0 01-1.384-2.46l.007-.042a2.25 2.25 0 01.29-.787l.09-.15a2.25 2.25 0 012.37-1.048l1.178.236a1.125 1.125 0 001.302-.795l.208-.73a1.125 1.125 0 00-.578-1.315l-.665-.332-.091.091a2.25 2.25 0 01-1.591.659h-.18c-.249 0-.487.1-.662.274a.931.931 0 01-1.458-1.137l1.279-2.132z" clipRule="evenodd" />
-          </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+        <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM8.547 4.505a8.25 8.25 0 1011.672 8.214l-.46-.46a2.252 2.252 0 01-.422-.586l-1.08-2.16a.414.414 0 00-.663-.107.827.827 0 01-.812.21l-1.273-.363a.89.89 0 00-.738 1.595l.587.39c.59.395.674 1.23.172 1.732l-.2.2c-.211.212-.33.498-.33.796v.41c0 .409-.11.809-.32 1.158l-1.315 2.191a2.11 2.11 0 01-1.81 1.025 1.055 1.055 0 01-1.055-1.055v-1.172c0-.92-.56-1.747-1.414-2.089l-.654-.261a2.25 2.25 0 01-1.384-2.46l.007-.042a2.25 2.25 0 01.29-.787l.09-.15a2.25 2.25 0 012.37-1.048l1.178.236a1.125 1.125 0 001.302-.795l.208-.73a1.125 1.125 0 00-.578-1.315l-.665-.332-.091.091a2.25 2.25 0 01-1.591.659h-.18c-.249 0-.487.1-.662.274a.931.931 0 01-1.458-1.137l1.279-2.132z" clipRule="evenodd" />
+      </svg>
         </button>
       </div>
 
       {/* Google Map */}
       <GoogleMap
         mapContainerStyle={containerStyle}
-        center={currentLocation || center as google.maps.LatLngLiteral}
-        zoom={10}
+        center={currentLocation || defaultCenter}
+        zoom={15}
         onLoad={onLoad}
         onUnmount={onUnmount}
       >
-        {markers.map((marker, index) => (
-          <GoogleMapMarker
-            key={index}
-            position={marker.position}
-            title={marker.name}
-            icon={{
-              url: '/custom-marker.gif',
-              scaledSize: new window.google.maps.Size(40, 40)
-            }}
-          />
+        {parkingSpots.map((spot, index) => (
+          <CustomMarker key={index} spot={spot} />
         ))}
         {currentLocation && (
           <GoogleMapMarker
             position={currentLocation}
             icon={{
               url: '/Motorbike.svg',
-              scaledSize: new window.google.maps.Size(100, 100)
+              scaledSize: new window.google.maps.Size(40, 40)
             }}
           />
         )}
       </GoogleMap>
+
+      <InfoPanel spot={selectedSpot} />
     </div>
   )
 }
