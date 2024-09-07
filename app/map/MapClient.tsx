@@ -82,6 +82,9 @@ function MapClient({ apiKey }: { apiKey: string }) {
 
   const [zoomLevel, setZoomLevel] = useState<number>(15); 
 
+  const [modalTitle, setModalTitle] = useState<string>("")
+  const [modalContent, setModalContent] = useState<string>("")
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchParkingData = useCallback(async (location: google.maps.LatLngLiteral) => {
@@ -127,6 +130,8 @@ function MapClient({ apiKey }: { apiKey: string }) {
 
         if (newCenter.lat < taipeiLatRange[0] || newCenter.lat > taipeiLatRange[1] ||
           newCenter.lng < taipeiLngRange[0] || newCenter.lng > taipeiLngRange[1]) {
+          setModalTitle("請搜尋台北市內的地點")
+          setModalContent("您選擇的地點不在台北市範圍內，將重設為預設位置")
           setIsModalOpen(true); // 打開 Modal
         } else {
           setCurrentLocation(newCenter);
@@ -139,7 +144,11 @@ function MapClient({ apiKey }: { apiKey: string }) {
         }
       } else {
         console.error('Place has no geometry');
-        alert('無法獲取該地點的位置資訊，請嘗試其他搜尋關鍵字。');
+        setModalTitle("無法獲取該地點的位置")
+        setModalContent("請嘗試其他搜尋關鍵字，或從下拉選單中選取")
+        setIsModalOpen(true); // 打開 Modal
+
+        
       }
     }
   }, [autocomplete, map, fetchParkingData]);
@@ -147,6 +156,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
   const onLoad = useCallback(function callback(map: google.maps.Map) {
     const bounds = new window.google.maps.LatLngBounds(defaultCenter);
     map.fitBounds(bounds);
+    map.setZoom(15);
     setMap(map);
 
     if (inputRef.current) {
@@ -158,7 +168,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
       autocompleteInstance.addListener('place_changed', handlePlaceSelect);
     }
 
-    map.setZoom(15);
+ 
     map.setCenter(defaultCenter);
   }, [handlePlaceSelect]);
 
@@ -251,13 +261,17 @@ function MapClient({ apiKey }: { apiKey: string }) {
               }
             } else {
               console.error('Place search was not successful');
-              alert('找不到該地點，請嘗試其他搜尋關鍵字。');
+              setModalTitle("找不到該地點")
+              setModalContent("請嘗試其他搜尋關鍵字，或選下拉選單中的地點")
+              setIsModalOpen(true); // 打開 Modal
             }
           });
         }
       }
     } else {
-      alert('請輸入搜尋關鍵字。');
+      setModalTitle("請輸入搜尋關鍵字")
+      setModalContent("")
+      setIsModalOpen(true); // 打開 Modal
     }
   }, [autocomplete, map, fetchParkingData, handlePlaceSelect]);
 
@@ -314,10 +328,15 @@ useEffect(() => {
     let payexWord;
     if(spot.payex.includes("元")){ payexWord = spot.payex.replace("元", "") } else if(
       spot.payex.includes("累進")){ payexWord ="累進"}
+
+    const handleNavigation = () => {
+      const googleMapsURL = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}&travelmode=driving`;
+      window.open(googleMapsURL, '_blank');
+    };
   
     return (
       <div
-      className={`fixed left-0 right-0 bottom-0 bg-white text-black p-4 shadow-lg 
+      className={`max-w-[700px] m-auto lg:rounded-3xl fixed left-0 right-0 bottom-0 lg:bottom-4 bg-white text-black p-4 shadow-lg 
                   transition-transform duration-500 ease-out transform ${spot ? 'translate-y-0' : 'translate-y-full'} 
                   opacity-${spot ? '100' : '0'} `}
       style={{ boxShadow: "0 -5px 10px rgba(0, 0, 0, 0.2)" }}
@@ -330,6 +349,12 @@ useEffect(() => {
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
+          <button
+            onClick={handleNavigation}
+            className="absolute left-0 top-0 bg-[#5AB4C5] text-white px-4 py-2 rounded-full shadow-lg text-sm"
+          >
+            導航
+          </button>
         </div>
         
         <div className="flex justify-center mt-1">
@@ -340,7 +365,7 @@ useEffect(() => {
 
   
         {/* 車位與收費區域 */}
-        <div className="flex justify-center gap-4 mt-4">
+        <div className="flex justify-center gap-4 mt-4 ">
           {/* 車位資訊 */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center justify-center w-10 h-10 bg-orange-500 rounded-full text-white font-bold">
@@ -390,9 +415,9 @@ useEffect(() => {
   if (!isLoaded) return <Loading />
 
   return (
-    <div className="relative w-screen h-screen max-w-[1200px] mx-auto">
+    <div className="relative w-screen h-screen max-w-[1200px] mx-auto ">
       {/* 標題欄 */}
-      <div className="fixed top-0 left-0 right-0 bg-white p-4 flex justify-between items-center z-10 shadow-md">
+      <div className="fixed top-0 left-0 right-0 bg-white p-4 flex justify-between items-center z-10 shadow-md m-auto max-w-[1200px]">
         <div className="w-10"></div>
         <h1 className="text-lg  text-black">猿來有車位</h1>
         <button 
@@ -407,7 +432,7 @@ useEffect(() => {
       </div>
 
       {/* 搜尋框 */}
-      <div className="absolute top-[80px] left-4 right-4 z-10">
+      <div className="absolute top-[80px] left-4 right-4 z-10 max-w-[500px] m-auto ">
         <div className="relative">
           <input
             ref={inputRef}
@@ -492,7 +517,8 @@ useEffect(() => {
           className="bg-white p-2 rounded-full shadow-md text-[#5AB4C5]"
           aria-label="獲取當前位置"
         >
-          {icon_earth}
+          <div>{icon_earth} </div>
+          <div className="text-xs">定位</div>
         </button>
       </div>
 
@@ -526,7 +552,7 @@ useEffect(() => {
       <InfoPanel vehicleType={vehicleType} spot={selectedSpot} onClose={() => setSelectedSpot(null)} />
 
       {isModalOpen && (
-        <Modal
+        <WarningModal
           title="請搜尋台北市內的地點"
           content="您選擇的地點不在台北市範圍內，將重設為預設位置。"
           onConfirm={handleModalConfirm}
@@ -580,13 +606,13 @@ const icon_map = (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
   <path d="M6 19V20C6 20.2833 5.90417 20.5208 5.7125 20.7125C5.52083 20.9042 5.28333 21 5 21H4C3.71667 21 3.47917 20.9042 3.2875 20.7125C3.09583 20.5208 3 20.2833 3 20V12L5.1 6C5.2 5.7 5.37917 5.45833 5.6375 5.275C5.89583 5.09167 6.18333 5 6.5 5H17.5C17.8167 5 18.1042 5.09167 18.3625 5.275C18.6208 5.45833 18.8 5.7 18.9 6L21 12V20C21 20.2833 20.9042 20.5208 20.7125 20.7125C20.5208 20.9042 20.2833 21 20 21H19C18.7167 21 18.4792 20.9042 18.2875 20.7125C18.0958 20.5208 18 20.2833 18 20V19H6ZM5.8 10H18.2L17.15 7H6.85L5.8 10ZM7.5 16C7.91667 16 8.27083 15.8542 8.5625 15.5625C8.85417 15.2708 9 14.9167 9 14.5C9 14.0833 8.85417 13.7292 8.5625 13.4375C8.27083 13.1458 7.91667 13 7.5 13C7.08333 13 6.72917 13.1458 6.4375 13.4375C6.14583 13.7292 6 14.0833 6 14.5C6 14.9167 6.14583 15.2708 6.4375 15.5625C6.72917 15.8542 7.08333 16 7.5 16ZM16.5 16C16.9167 16 17.2708 15.8542 17.5625 15.5625C17.8542 15.2708 18 14.9167 18 14.5C18 14.0833 17.8542 13.7292 17.5625 13.4375C17.2708 13.1458 16.9167 13 16.5 13C16.0833 13 15.7292 13.1458 15.4375 13.4375C15.1458 13.7292 15 14.0833 15 14.5C15 14.9167 15.1458 15.2708 15.4375 15.5625C15.7292 15.8542 16.0833 16 16.5 16ZM5 17H19V12H5V17Z" />
   </svg>)
 
-interface ModalProps {
+interface WarningModalProps {
   title: string;
   content: string;
   onConfirm: () => void;
 }
 
-const Modal: React.FC<ModalProps> = ({ title, content, onConfirm }) => {
+const WarningModal: React.FC<WarningModalProps> = ({ title, content, onConfirm }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
       <div className="bg-white text-black p-6 rounded-lg shadow-lg w-80 text-center">
@@ -601,7 +627,7 @@ const Modal: React.FC<ModalProps> = ({ title, content, onConfirm }) => {
         <h2 className="text-lg font-bold mb-4">{title}</h2>
         
         {/* 內容 */}
-        <p className="mb-6">{content}</p>
+        <p className="mb-6 text-sm">{content}</p>
 
         {/* 按鈕 */}
         <button
