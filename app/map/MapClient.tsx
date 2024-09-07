@@ -70,7 +70,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [parkingSpots, setParkingSpots] = useState<ParkingSpot[]>([]);
   const [vehicleType, setVehicleType] = useState<'motorcycle' | 'car'>('car')
-  const [viewMode, setViewMode] = useState<'mapview'|'AR'>('AR');
+  const [viewMode, setViewMode] = useState<'mapview'|'AR'>('mapview');
   const [currentLocation, setCurrentLocation] = useState<google.maps.LatLngLiteral | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<ParkingSpot | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
