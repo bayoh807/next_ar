@@ -23,8 +23,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: any) {
     return (
         <html lang="en" suppressHydrationWarning>
-
-        <head />
+        {/* <head >
+            <meta http-equiv="Content-Security-Policy" content="default-src 'self';
+            connect-src 'self' * https://itaipeiparking.pma.gov.taipei  " />
+        </head>  */}
 
         <body>
         <ThemeProvider attribute="class" defaultTheme="light" >
