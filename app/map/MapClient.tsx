@@ -653,20 +653,9 @@ const WarningModal: React.FC<WarningModalProps> = ({ title, content, onConfirm }
 };
 
 const Loading = () => {
-  const [showLoading, setShowLoading] = useState(true);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowLoading(false);
-    }, 3000); // 3 seconds minimum display time
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!showLoading) return null;
-
-  return (
-    <div className="fixed inset-0 z-50">
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="w-full h-full max-h-screen lg:h-[1100px] lg:w-[500px] overflow-hidden"></div>
       <video
         className="w-full h-full object-cover"
         autoPlay
@@ -681,5 +670,4 @@ const Loading = () => {
         <p className="text-white text-lg font-bold">載入中，請稍候...</p>
       </div> */}
     </div>
-  );
 };
