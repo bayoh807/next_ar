@@ -543,7 +543,7 @@ useEffect(() => {
             position={currentLocation}
             icon={{
               url: '/Motorbike.svg',
-              scaledSize: new window.google.maps.Size(40, 40)
+              scaledSize: new window.google.maps.Size(60, 60)
             }}
           />
         )}
