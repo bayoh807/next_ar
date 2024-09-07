@@ -8,7 +8,7 @@ import LandingPage from './LandingPage';
 import { handleConnectionMessage } from '../../util/handleConnectionMessage';
 
 
-const ARScene = dynamic(() => import('../../components/ARScene'), { ssr: false });
+// const ARScene = dynamic(() => import('../../components/ARScene'), { ssr: false });
 
 
 
