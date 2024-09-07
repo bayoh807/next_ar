@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { GoogleMap, useJsApiLoader, Marker as GoogleMapMarker } from '@react-google-maps/api'
 import Image from 'next/image'
 
@@ -68,6 +68,10 @@ function MapClient({ apiKey }: { apiKey: string }) {
   const [selectedSpot, setSelectedSpot] = useState<ParkingSpot | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  const [lastFetchedLocation, setLastFetchedLocation] = useState<google.maps.LatLngLiteral | null>(null);
+
   const onLoad = useCallback(function callback(map: google.maps.Map) {
     const bounds = new window.google.maps.LatLngBounds(defaultCenter);
     map.fitBounds(bounds);
@@ -78,14 +82,43 @@ function MapClient({ apiKey }: { apiKey: string }) {
     setMap(null);
   }, []);
 
-  const handleLocationError = (browserHasGeolocation: boolean) => {
+  const fetchParkingData = useCallback(async (location: google.maps.LatLngLiteral) => {
+    // 检查是否需要获取新数据
+    if (!lastFetchedLocation || 
+        location.lat !== lastFetchedLocation.lat || 
+        location.lng !== lastFetchedLocation.lng) {
+      try {
+        const response = await fetch('/api/parkingData', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            lon: location.lng,
+            lat: location.lat,
+          }),
+        });
+
+        // console.log('Fetch response status:', response.status);
+        const data = await response.json();
+        // console.log('Received parking data:', data);
+        setParkingSpots(data);
+        setLastFetchedLocation(location);
+      } catch (error) {
+        console.error('Error fetching parking data:', error);
+      }
+    }
+  }, [lastFetchedLocation]);
+
+  const handleLocationError = useCallback((browserHasGeolocation: boolean) => {
     console.warn(browserHasGeolocation ?
                   "Error: The Geolocation service failed." :
                   "Error: Your browser doesn't support geolocation.");
     fetchParkingData(defaultCenter);
-  };
+  }, [fetchParkingData]);
+  
 
-  const getCurrentLocation = () => {
+  const getCurrentLocation = useCallback(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -107,50 +140,61 @@ function MapClient({ apiKey }: { apiKey: string }) {
     } else {
       handleLocationError(false);
     }
-  };
+  }, [fetchParkingData, handleLocationError, map]);
+  
 
-  const fetchParkingData = async (location: google.maps.LatLngLiteral) => {
-  try {
-    const response = await fetch('/api/parkingData', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        lon: location.lng,
-        lat: location.lat,
-      }),
-    });
-
-    console.log('Fetch response status:', response.status);
-    const data = await response.json();
-    console.log('Received parking data:', data);
-    setParkingSpots(data); // 这里设置状态
-  } catch (error) {
-    console.error('Error fetching parking data:', error);
-  }
-};
-  useEffect(() => {
-    getCurrentLocation();
-  }, []);
-
-  const handleSearch = () => {
-    if (map && inputRef.current) {
+  const handleSearch = useCallback(() => {
+    if (inputRef.current && inputRef.current.value.trim() !== '' && map) {
       const service = new google.maps.places.PlacesService(map);
-      const request = {
-        query: inputRef.current.value,
-        fields: ['name', 'geometry'],
-      };
+      service.textSearch(
+        {
+          query: inputRef.current.value,
+          location: map.getCenter(),
+          radius: 50000 // 搜索半径，单位为米
+        },
+        (results, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
+            const place = results[0];
+            const location = place.geometry?.location;
+            if (location) {
+              const newCenter = { lat: location.lat(), lng: location.lng() };
+              console.log('Search result:', place.name, newCenter);
 
-      service.findPlaceFromQuery(request, (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]?.geometry?.location) {
-          const location = results[0].geometry.location.toJSON();
-          map.setCenter(location);
-          fetchParkingData(location);
+              setCurrentLocation(newCenter);
+              setLastFetchedLocation(newCenter);
+              
+              if (map) {
+                map.setCenter(newCenter);
+                map.setZoom(15);
+              }
+
+              fetchParkingData(newCenter);
+            }
+          } else {
+            console.error('Place search was not successful');
+            alert('找不到該地點，請嘗試其他搜索詞。');
+          }
         }
-      });
+      );
+    } else {
+      alert('請輸入搜索詞。');
     }
+  }, [map, fetchParkingData]);
+
+  useEffect(() => {
+    if (isInitialLoad) {
+      getCurrentLocation();
+      setIsInitialLoad(false);
+    }
+  }, [isInitialLoad, getCurrentLocation]);
+
+useEffect(() => {
+  if (map && currentLocation) {
+    map.setCenter(currentLocation);
+    map.setZoom(15);
   }
+}, [map, currentLocation]);
+
   interface CustomMarkerProps {
     spot: ParkingSpot;
     vehicleType: 'car' | 'motorcycle';
@@ -160,7 +204,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
   const CustomMarker: React.FC<CustomMarkerProps> = ({ spot, vehicleType, onMarkerClick }) => {
     const remainderNum = vehicleType === 'car' ? spot.carRemainderNum : spot.motorRemainderNum;
     
-    console.log(`${spot.parkName} 的標記:`, { vehicleType, remainderNum, spot });
+    // console.log(`${spot.parkName} 的標記:`, { vehicleType, remainderNum, spot });
   
     // 只在有可用車位時渲染標記
     if (remainderNum > 0) {
@@ -199,6 +243,16 @@ function MapClient({ apiKey }: { apiKey: string }) {
     );
   };
 
+  const uniqueParkingSpots = useMemo(() => {
+    const uniqueSpots = new Map();
+    parkingSpots.forEach(spot => {
+      if (!uniqueSpots.has(spot.parkId)) {
+        uniqueSpots.set(spot.parkId, spot);
+      }
+    });
+    return Array.from(uniqueSpots.values());
+  }, [parkingSpots]);
+
   if (!isLoaded) return <div>Loading...</div>
 
   return (
@@ -224,8 +278,13 @@ function MapClient({ apiKey }: { apiKey: string }) {
           <input
             ref={inputRef}
             type="text"
-            placeholder="請輸入地址"
+            placeholder="請輸入地點"
             className="w-full p-3 pr-12 rounded-xl border text-black bg-white shadow-md"
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleSearch();
+              }
+            }}
           />
           <button
             onClick={handleSearch}
@@ -282,7 +341,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
         onLoad={onLoad}
         onUnmount={onUnmount}
       >
-        {parkingSpots.map((spot) => (
+        {uniqueParkingSpots.map((spot) => (
           <CustomMarker
             key={spot.parkId}
             spot={spot}
