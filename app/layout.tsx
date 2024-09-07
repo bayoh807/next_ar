@@ -1,6 +1,7 @@
 
 import type { Metadata,Viewport } from 'next';
 import { ThemeProvider } from "./../components/theme-provider"
+import Link from 'next/link'
 
 export const viewport :Viewport= {
     themeColor:  [
@@ -30,6 +31,9 @@ export default function RootLayout({
         <body>
         <ThemeProvider attribute="class" defaultTheme="light" >
             <main className="">{children}</main>
+            <Link href="/map">
+                <h3>查看地圖</h3>
+            </Link>
         </ThemeProvider>
         </body>
         </html>
