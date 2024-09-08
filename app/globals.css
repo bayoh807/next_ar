@@ -9,3 +9,7 @@ body, html {
     width: 100%;
     overflow: hidden;
   }
+
+.loading-bg {
+    background-image: url("./../public/background.svg");
+}

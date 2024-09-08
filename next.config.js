@@ -4,7 +4,7 @@ const nextConfig = {
     domains: ['maps.googleapis.com'],
   },
   safelist: [
-    "bg-[url('/background.svg')]",
+    "bg-[url('/public/background.svg')]",
   ],
   basePath: "",
   output: "standalone",

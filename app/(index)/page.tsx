@@ -36,7 +36,7 @@ export default function Index() {
 
     useEffect(() => {
         if (data) {
-            router.push('/map');
+            // router.push('/map');
         }
     }, [data, router]);
 
