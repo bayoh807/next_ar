@@ -423,7 +423,9 @@ useEffect(() => {
     }
   };
   
-  if (!isLoadingComplete){ return <Loading /> }
+  if (!isLoadingComplete){ 
+    return <Loading /> ;
+  }
 
   return (
     <div className="relative w-screen h-screen max-w-[1200px] mx-auto ">
@@ -653,21 +655,23 @@ const WarningModal: React.FC<WarningModalProps> = ({ title, content, onConfirm }
 };
 
 const Loading = () => {
-
-  <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div className="w-full h-full max-h-screen lg:h-[1100px] lg:w-[500px] overflow-hidden"></div>
-      <video
-        className="w-full h-full object-cover"
-        autoPlay
-        loop
-        muted
-        playsInline
-      >
-        <source src="/monkeyMagic.mp4" type="video/mp4" />
-        Your browser does not support the video tag.
-      </video>
-      {/* <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-        <p className="text-white text-lg font-bold">載入中，請稍候...</p>
-      </div> */}
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="w-full h-full max-h-screen lg:h-[1100px] lg:w-[500px] overflow-hidden">
+        <video
+          className="w-full h-full object-cover"
+          autoPlay
+          loop
+          muted
+          playsInline
+        >
+          <source src="/monkeyMagic.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+        {/* <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <p className="text-white text-lg font-bold">載入中，請稍候...</p>
+        </div> */}
+      </div>
     </div>
+  );
 };
