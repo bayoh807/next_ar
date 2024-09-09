@@ -117,9 +117,16 @@ function MapClient({ apiKey }: { apiKey: string }) {
 
         // console.log('Fetch response status:', response.status);
         const data = await response.json();
-        // console.log('Received parking data:', data);
-        setParkingSpots(data);
-        setLastFetchedLocation(location);
+
+        if ( data.error){
+          setModalTitle("無法取得車格資料")
+          setModalContent("請稍後再試")
+          setIsModalOpen(true); 
+        }else {
+          // console.log('Received parking data:', data);
+          setParkingSpots(data);
+          setLastFetchedLocation(location);
+        }
       } catch (error) {
         console.error("Error fetching parking data:", error);
       }
