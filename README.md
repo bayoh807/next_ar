@@ -1,3 +1,9 @@
+本專案串接台北停車 API  https://itaipeiparking.pma.gov.taipei/MapAPI/GetAllPOIData
+取得路邊停車格資訊（汽車），藉由定位使用者所在位置，輕鬆尋找附近區塊的剩餘停車格數量與收費標準。
+使用者也可以直接點選 Google Map 上的景點，跳出 InfoWindow 後定位到該處，尋找附近的車位，
+或是使用搜尋跟自動完成功能，找尋北市內的路邊停車位。
+超過台北市的範圍太遠，會無法搜尋喔！
+
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
