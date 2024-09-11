@@ -1,15 +1,16 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { GoogleMap, useJsApiLoader, Marker as GoogleMapMarker } from '@react-google-maps/api'
+import { GoogleMap, useJsApiLoader, Marker as GoogleMapMarker, InfoWindow } from '@react-google-maps/api'
+import Background from 'three/src/renderers/common/Background.js';
 // import { useRouter } from 'next/router';
-import Link from "next/link"
 
 const containerStyle = {
   width: "100vw",
   height: "100vh",
   maxWidth: "1200px", // 設定桌面版寬度限制
   margin: "0 auto", // 讓地圖在桌面版居中
+  Background: "white"
 };
 
 const defaultCenter = {
@@ -68,9 +69,10 @@ function MapClient({ apiKey }: { apiKey: string }) {
   })
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null);
   const [parkingSpots, setParkingSpots] = useState<ParkingSpot[]>([]);
   const [vehicleType, setVehicleType] = useState<'motorcycle' | 'car'>('car')
-  const [viewMode, setViewMode] = useState<'mapview'|'AR'>('mapview');
+  const [viewMode, setViewMode] = useState<'mapView'|'AR'>('mapView');
   const [currentLocation, setCurrentLocation] = useState<google.maps.LatLngLiteral | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<ParkingSpot | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
@@ -99,10 +101,21 @@ function MapClient({ apiKey }: { apiKey: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchParkingData = useCallback(async (location: google.maps.LatLngLiteral) => {
-    // 检查是否需要获取新数据
     if (!lastFetchedLocation || 
         location.lat !== lastFetchedLocation.lat || 
         location.lng !== lastFetchedLocation.lng) {
+
+
+        const taipeiLatRange = [24.9, 25.2];
+        const taipeiLngRange = [121.45, 121.7];
+
+        if (location.lat < taipeiLatRange[0] || location.lat > taipeiLatRange[1] ||
+          location.lng < taipeiLngRange[0] || location.lng > taipeiLngRange[1]) {
+          setModalTitle("請搜尋台北市內的地點")
+          setModalContent("您所在或選擇的地點不在台北市範圍內，將重設為預設位置")
+          setIsModalOpen(true); // 打開 Modal
+          return 
+        } 
       try {
         const response = await fetch('/api/parkingData', {
           method: "POST",
@@ -118,7 +131,7 @@ function MapClient({ apiKey }: { apiKey: string }) {
         // console.log('Fetch response status:', response.status);
         const data = await response.json();
 
-        if ( data.error){
+        if (data.error){
           setModalTitle("無法取得車格資料")
           setModalContent("請稍後再試")
           setIsModalOpen(true); 
@@ -128,6 +141,9 @@ function MapClient({ apiKey }: { apiKey: string }) {
           setLastFetchedLocation(location);
         }
       } catch (error) {
+        setModalTitle("無法取得車格資料")
+        setModalContent("請稍後再試")
+        setIsModalOpen(true); 
         console.error("Error fetching parking data:", error);
       }
     }
@@ -171,24 +187,107 @@ function MapClient({ apiKey }: { apiKey: string }) {
     }
   }, [autocomplete, map, fetchParkingData]);
 
+
   const onLoad = useCallback(function callback(map: google.maps.Map) {
-    const bounds = new window.google.maps.LatLngBounds(defaultCenter);
-    map.fitBounds(bounds);
-    map.setZoom(15);
+
     setMap(map);
+
+    // const bounds = new window.google.maps.LatLngBounds(defaultCenter);
+    // map.fitBounds(bounds);
+    map.setZoom(10);
+    map.setCenter(defaultCenter);
 
     if (inputRef.current) {
       const autocompleteInstance = new google.maps.places.Autocomplete(inputRef.current, {
         types: ['geocode']
       });
       setAutocomplete(autocompleteInstance);
-
-      autocompleteInstance.addListener('place_changed', handlePlaceSelect);
     }
+      // autocompleteInstance.addListener('place_changed', handlePlaceSelect);
+      map.addListener("click", (event: google.maps.MapMouseEvent) => {
+        if (event.placeId) {
+          // 阻止預設行為
+          event.stop();
+      
+          // 使用 PlacesService 獲取 POI 詳細信息
+          const service = new google.maps.places.PlacesService(map);
+          service.getDetails({ placeId: event.placeId }, (place, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && place && place.geometry?.location) {
+              const position = {
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng(),
+              };
+      
+              // 顯示 InfoWindow 並保持原有內容，動態插入按鈕
+              if (infoWindow) infoWindow.close(); // 關閉現有的 infoWindow
+              const newInfoWindow = new google.maps.InfoWindow({ position });
+      
+              // 使用 DOM 操作動態插入按鈕，而不替換 InfoWindow 的內容
+              const contentDiv = document.createElement('div');
+              contentDiv.innerHTML = `
+              <div style="color: black; z-index: 5;">
+                <h3 style="font-size: 16px; font-weight: bold; color: black; z-index: 5; margin-bottom: 10; max-width: 200px; word-wrap: break-word">${place.name}</h3>
+                <p style="color: black; z-index: 5;">${place.formatted_address || "地址不可用"}</p>
+              </div>
+            `;
+            
+            // 創建 "查看附近車位" 按鈕
+            const checkParkingButton = document.createElement('button');
+            checkParkingButton.innerText = '查看附近車位';
+            checkParkingButton.style.backgroundColor = '#54BAC5'; // 綠色背景
+            checkParkingButton.style.border = 'none';
+            checkParkingButton.style.color = 'white';
+            checkParkingButton.style.padding = '5px 10px';
+            checkParkingButton.style.textAlign = 'center';
+            checkParkingButton.style.textDecoration = 'none';
+            checkParkingButton.style.fontStyle = "bold"
+            checkParkingButton.style.display = 'inline-block';
+            checkParkingButton.style.fontSize = '12px';
+            checkParkingButton.style.marginTop = '10px';
+            checkParkingButton.style.cursor = 'pointer';
+            checkParkingButton.style.borderRadius = '5px'; 
 
- 
-    map.setCenter(defaultCenter);
-  }, [handlePlaceSelect]);
+            contentDiv.appendChild(checkParkingButton);
+
+              // 添加 "在 Google Maps 中查看" 按鈕
+              const viewOnMapButton = document.createElement('button');
+              viewOnMapButton.innerText = 'Google Map';
+              viewOnMapButton.style.border = 'none';
+              viewOnMapButton.style.color = '#4285F4';
+              viewOnMapButton.style.padding = '5px 10px';
+              viewOnMapButton.style.textAlign = 'center';
+              viewOnMapButton.style.textDecoration = 'none';
+              viewOnMapButton.style.display = 'inline-block';
+              checkParkingButton.style.marginTop = '10px';
+              viewOnMapButton.style.fontSize = '12px';
+              viewOnMapButton.style.cursor = 'pointer';
+              viewOnMapButton.style.borderRadius = '5px'; // 添加圓角
+
+              contentDiv.appendChild(viewOnMapButton);
+      
+              newInfoWindow.setContent(contentDiv);
+              newInfoWindow.open(map);
+              setInfoWindow(newInfoWindow);
+      
+              // 綁定按鈕點擊事件
+              google.maps.event.addListenerOnce(newInfoWindow, 'domready', () => {
+                checkParkingButton.addEventListener('click', () => {
+                  setCurrentLocation(position);
+                  fetchParkingData(position);
+                  newInfoWindow.close();
+                });
+              
+                // "在 Google Maps 中查看" 按鈕事件
+                viewOnMapButton.addEventListener('click', () => {
+                  const googleMapsURL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}`;
+                  window.open(googleMapsURL, '_blank'); // 在新標籤頁中打開 Google Maps
+                });
+              });
+            }
+          });
+        }
+      });
+}, [handlePlaceSelect, fetchParkingData, infoWindow]);
 
   const onUnmount = useCallback(function callback(map: google.maps.Map) {
     setMap(null);
@@ -386,12 +485,12 @@ useEffect(() => {
         <div className="flex justify-center gap-4 mt-4 ">
           {/* 車位資訊 */}
           <div className="flex items-center space-x-4">
-            <div className="flex items-center justify-center w-10 h-10 bg-orange-500 rounded-full text-white font-bold">
+            <div className="flex items-center justify-center w-10 h-10 bg-blue-500 rounded-full text-white font-bold">
               P
             </div>
             <p className="text-lg font-semibold">{vehicleType === 'car' ? spot.carRemainderNum : spot.motorRemainderNum}</p>
-            <div className="flex items-center justify-center w-10 h-10 bg-gray-300 rounded-xl text-xs text-center">
-              <span>尚有<br/>車位</span>
+            <div className="flex items-center justify-center w-10 h-10 rounded-full text-xs text-center border p-1 border-blue-500">
+              <span>剩餘<br/>車位</span>
             </div>
           </div>
   
@@ -433,13 +532,14 @@ useEffect(() => {
   if (!isLoadingComplete){ return <Loading /> }
 
   return (
-    <div className="relative w-screen h-screen max-w-[1200px] mx-auto ">
+    <div className="relative w-screen h-screen max-w-[1200px] mx-auto bg-gray-200">
       {/* 標題欄 */}
-      <div className="fixed top-0 left-0 right-0 bg-white p-4 flex justify-between items-center z-10 shadow-md m-auto max-w-[1200px]">
+      <div className="fixed top-0 left-0 right-0  p-4 flex justify-between items-center z-10 shadow-md m-auto max-w-[1200px] bg-gray-200">
         <div className="w-10"></div>
         <h1 className="text-lg  text-black">猿來有車位</h1>
         <button 
-          className="w-7 h-7 bg-black rounded-sm flex items-center justify-center transition-transform duration-300 active:bg-white active:text-black"
+          className="invisible w-7 h-7 bg-black rounded-sm flex items-center justify-center transition-transform duration-300 active:bg-white active:text-black"
+          // style={{ visibility: "hidden" }}
           aria-label="關閉"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
@@ -500,31 +600,29 @@ useEffect(() => {
       </div>
 
        {/* AR按鈕 */}
-       <div className="absolute right-4 top-[150px] z-10">
+       <div className="hidden absolute right-4 top-[150px] z-10">
         <div className="bg-white rounded-2xl shadow-md p-1 flex flex-col">
           <button
             className={`p-2 w-10 h-10 rounded-full transition-colors duration-300 ${
-              viewMode === 'mapview' ? 'bg-[#5AB4C5] text-white' : 'text-[#5AB4C5]'
+              viewMode === 'mapView' ? 'bg-[#5AB4C5] text-white' : 'text-[#5AB4C5]'
             }`}
-            onClick={() => setViewMode('mapview')}
+            onClick={() => setViewMode('mapView')}
             aria-label="地圖模式"
           >
             {icon_map}
           </button>
-          <Link href="/ar">
-            <button
-              className={`p-2 w-10 h-10 rounded-full transition-colors duration-300 ${
-                viewMode === 'AR' ? 'bg-[#5AB4C5] text-white' : 'text-[#5AB4C5]'
-              }`}
-              onClick={() => {
-                setViewMode('AR')
-                // router.push('/ar');
-              }}
-              aria-label="AR模式"
-            >
-              {icon_ar}
-            </button>
-          </Link>
+          <button
+            className={`p-2 w-10 h-10 rounded-full transition-colors duration-300 ${
+              viewMode === 'AR' ? 'bg-[#5AB4C5] text-white' : 'text-[#5AB4C5]'
+            }`}
+            onClick={() => {
+              setViewMode('AR')
+              // router.push('/ar');
+            }}
+            aria-label="AR模式"
+          >
+            {icon_ar}
+          </button>
         </div>
       </div>
 
@@ -659,22 +757,25 @@ const WarningModal: React.FC<WarningModalProps> = ({ title, content, onConfirm }
   );
 };
 
-const Loading = () => {
-
-  <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div className="w-full h-full max-h-screen lg:h-[1100px] lg:w-[500px] overflow-hidden"></div>
-      <video
-        className="w-full h-full object-cover"
-        autoPlay
-        loop
-        muted
-        playsInline
-      >
-        <source src="/monkeyMagic.mp4" type="video/mp4" />
-        Your browser does not support the video tag.
-      </video>
+const Loading: React.FC = () => {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-700">
+      {/* 外層容器控制寬高比例，確保影片在螢幕中顯示 */}
+      <div className="relative w-full h-full aspect-video">
+        <video
+          className="absolute inset-0 w-full h-full object-contain"
+          autoPlay
+          loop
+          muted
+          playsInline
+        >
+          <source src="/monkeyMagic.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+      </div>
       {/* <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
         <p className="text-white text-lg font-bold">載入中，請稍候...</p>
       </div> */}
     </div>
+  );
 };
