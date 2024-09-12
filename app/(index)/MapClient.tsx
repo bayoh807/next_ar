@@ -168,6 +168,10 @@ function MapClient({ apiKey }: { apiKey: string }) {
           setModalContent("您選擇的地點不在台北市範圍內，將重設為預設位置")
           setIsModalOpen(true); // 打開 Modal
         } else {
+          setIsModalOpen(false);
+          setModalTitle("");
+          setModalContent("");
+  
           setCurrentLocation(newCenter);
           setLastFetchedLocation(newCenter);
           if (map) {
@@ -187,6 +191,10 @@ function MapClient({ apiKey }: { apiKey: string }) {
     }
   }, [autocomplete, map, fetchParkingData]);
 
+  interface ExtendedGoogleMapMouseEvent extends google.maps.MapMouseEvent {
+    placeId?: string;
+  }
+  
 
   const onLoad = useCallback(function callback(map: google.maps.Map) {
 
@@ -204,7 +212,8 @@ function MapClient({ apiKey }: { apiKey: string }) {
       setAutocomplete(autocompleteInstance);
     }
       // autocompleteInstance.addListener('place_changed', handlePlaceSelect);
-      map.addListener("click", (event: google.maps.MapMouseEvent) => {
+      map.addListener("click", (event: ExtendedGoogleMapMouseEvent) => {
+        
         if (event.placeId) {
           // 阻止預設行為
           event.stop();
@@ -279,8 +288,11 @@ function MapClient({ apiKey }: { apiKey: string }) {
               
                 // "在 Google Maps 中查看" 按鈕事件
                 viewOnMapButton.addEventListener('click', () => {
-                  const googleMapsURL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}`;
-                  window.open(googleMapsURL, '_blank'); // 在新標籤頁中打開 Google Maps
+
+                  if(place.name){
+                    const googleMapsURL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}`;
+                    window.open(googleMapsURL, '_blank'); // 在新標籤頁中打開 Google Maps
+                  }
                 });
               });
             }
@@ -362,8 +374,14 @@ function MapClient({ apiKey }: { apiKey: string }) {
 
                 if (newCenter.lat < taipeiLatRange[0] || newCenter.lat > taipeiLatRange[1] ||
                   newCenter.lng < taipeiLngRange[0] || newCenter.lng > taipeiLngRange[1]) {
+                  setModalTitle("請搜尋台北市內的地點");
+                  setModalContent("您選擇的地點不在台北市範圍內，將重設為預設位置");
                   setIsModalOpen(true);
                 } else {
+
+                  setIsModalOpen(false);
+                  setModalTitle("");
+                  setModalContent("");
 
                   setCurrentLocation(newCenter);
                   setLastFetchedLocation(newCenter);
